@@ -16,7 +16,6 @@ public class GameController {
         menu = new MainMenuView();
         menu.setStartCB(this::startGame);
         menu.setExitCB(this::confirmExit);
-        AudioManager.getInstance().play("/assets/theme.wav");
         menu.setVisible(true);
     }
 
@@ -31,6 +30,8 @@ public class GameController {
         window = new GameWindow(state, turnCtrl, unitCtrl, bldCtrl);
         turnCtrl.setWindow(window);
         window.setVisible(true);
+
+        AudioManager.getInstance().play("/assets/theme.wav");
     }
 
     private void confirmExit() {
