@@ -57,49 +57,72 @@ public class UnitController {
         return new ArrayList<>(result);
     }
 
-    public boolean move(Unit u, HexCell dest) {
-        if (u == null || dest == null || u.getPosition() == null) return false;
-        if (u.getPosition().equals(dest)) return false;
-
-        int cost = pathCost(u, dest);
-        if (cost < 0 || !u.hasAP(cost)) return false;
-
-        HexCell from = u.getPosition();
-        u.spendAP(cost);
-        from.removeUnit(u);
-        dest.addUnit(u);
-        u.setPosition(dest);
-
-        state.getFog().update(state.getUnits(), state.getBuildings());
-        return true;
-    }
-
-    private int pathCost(Unit u, HexCell dest) {
-        HexMap map = state.getMap();
+    public List<HexCell> path(Unit u, HexCell dest) {
+        if (u == null || dest == null || u.getPosition() == null) return List.of();
         HexCell start = u.getPosition();
+        if (start.equals(dest)) return List.of();
 
-        Map<HexCell, Integer> bestCost = new HashMap<>();
+        HexMap map = state.getMap();
+        Map<HexCell, Integer>  bestCost = new HashMap<>();
+        Map<HexCell, HexCell>  parent   = new HashMap<>();
         bestCost.put(start, 0);
+
         PriorityQueue<HexCell> frontier =
                 new PriorityQueue<>(Comparator.comparingInt(bestCost::get));
         frontier.add(start);
 
         while (!frontier.isEmpty()) {
             HexCell current = frontier.poll();
+            if (current.equals(dest)) break;
             int currentCost = bestCost.get(current);
-            if (current.equals(dest)) return currentCost;
 
             for (HexCell next : map.getNeighbors(current)) {
-                int stepCost = next.getTerrain().getMovementCost();
-                int newCost  = currentCost + stepCost;
+                int newCost = currentCost + next.getTerrain().getMovementCost();
                 Integer known = bestCost.get(next);
                 if (known == null || newCost < known) {
                     bestCost.put(next, newCost);
+                    parent.put(next, current);
                     frontier.add(next);
                 }
             }
         }
-        return -1;
+
+        Integer totalCost = bestCost.get(dest);
+        if (totalCost == null || totalCost > u.getCurrentAP()) return List.of();
+
+        LinkedList<HexCell> result = new LinkedList<>();
+        HexCell cur = dest;
+        while (!cur.equals(start)) {
+            result.addFirst(cur);
+            cur = parent.get(cur);
+        }
+        return result;
+    }
+
+    public boolean stepOnce(Unit u, HexCell next) {
+        if (u == null || next == null || u.getPosition() == null) return false;
+        if (!state.getMap().getNeighbors(u.getPosition()).contains(next)) return false;
+
+        int cost = next.getTerrain().getMovementCost();
+        if (!u.hasAP(cost)) return false;
+
+        HexCell from = u.getPosition();
+        u.spendAP(cost);
+        from.removeUnit(u);
+        next.addUnit(u);
+        u.setPosition(next);
+
+        state.getFog().update(state.getUnits(), state.getBuildings());
+        return true;
+    }
+
+    public boolean move(Unit u, HexCell dest) {
+        List<HexCell> steps = path(u, dest);
+        if (steps.isEmpty()) return false;
+        for (HexCell step : steps) {
+            if (!stepOnce(u, step)) return false;
+        }
+        return true;
     }
 
     public boolean station(Worker w, Building b) {

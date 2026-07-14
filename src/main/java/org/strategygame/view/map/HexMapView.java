@@ -5,7 +5,6 @@ import org.strategygame.model.map.FogOfWar;
 import org.strategygame.model.map.HexCell;
 import org.strategygame.model.map.HexMap;
 import org.strategygame.model.map.TerrainType;
-import org.strategygame.model.resource.ResourceType;
 import org.strategygame.model.unit.Unit;
 
 import javax.swing.*;
@@ -29,6 +28,7 @@ public class HexMapView extends JPanel {
 
     private int camX = 0, camY = 0;
     private int dragOX, dragOY;
+    private boolean cameraCentered = false;
 
     private HexMap   map;
     private FogOfWar fog;
@@ -46,16 +46,26 @@ public class HexMapView extends JPanel {
     public HexMapView() {
         setBackground(new Color(15, 15, 20));
         setupInput();
+        addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) {
+                if (!cameraCentered) centerCamera();
+            }
+        });
     }
 
     public void setMapData(HexMap map, FogOfWar fog) {
         this.map = map;
         this.fog = fog;
+        repaint();
+    }
 
+    public void centerCamera() {
+        if (map == null || getWidth() == 0 || getHeight() == 0) return;
         int cx = map.getWidth() / 2, cy = map.getHeight() / 2;
         Point2D center = toScreen(cx, cy);
         camX = getWidth()  / 2 - (int) center.x();
         camY = getHeight() / 2 - (int) center.y();
+        cameraCentered = true;
         repaint();
     }
 
@@ -131,7 +141,7 @@ public class HexMapView extends JPanel {
         g.setColor(base);
         g.fill(hex);
 
-        if (explored) paintResourceDot(g, c, cell);
+        if (explored) paintResourceIcon(g, c, cell);
 
         if (cell.hasBuilding()) paintBuildingIcon(g, c, cell.getBuilding());
 
@@ -158,17 +168,102 @@ public class HexMapView extends JPanel {
         g.draw(hex);
     }
 
-    private void paintResourceDot(Graphics2D g, Point2D c, HexCell cell) {
+    private void paintResourceIcon(Graphics2D g, Point2D c, HexCell cell) {
         if (cell.getDeposit() == null) return;
-        int ox = (int) c.x() - 5, oy = (int) c.y() - 5;
+        int cx = (int) c.x();
+        int cy = (int) c.y() + (cell.hasBuilding() ? -14 : 0);
+
         if (cell.getDeposit().isDepleted()) {
-            g.setColor(new Color(80, 80, 80, 160));
-        } else {
-            g.setColor(resourceColor(cell.getDeposit().getType()));
+            paintDepletedIcon(g, cx, cy);
+            return;
         }
-        g.fillOval(ox, oy, 11, 11);
-        g.setColor(Color.BLACK);
-        g.drawOval(ox, oy, 11, 11);
+        switch (cell.getDeposit().getType()) {
+            case STONE -> paintStoneIcon(g, cx, cy);
+            case WOOD  -> paintWoodIcon(g, cx, cy);
+            case FOOD  -> paintWheatIcon(g, cx, cy);
+            case IRON  -> paintIronIcon(g, cx, cy);
+        }
+    }
+
+    private void paintStoneIcon(Graphics2D g, int cx, int cy) {
+        GeneralPath rock = new GeneralPath();
+        rock.moveTo(cx - 8, cy + 4);
+        rock.lineTo(cx - 6, cy - 3);
+        rock.lineTo(cx,     cy - 6);
+        rock.lineTo(cx + 6, cy - 3);
+        rock.lineTo(cx + 8, cy + 4);
+        rock.lineTo(cx + 3, cy + 6);
+        rock.lineTo(cx - 3, cy + 6);
+        rock.closePath();
+        g.setColor(new Color(165, 165, 172));
+        g.fill(rock);
+        g.setColor(new Color(90, 90, 98));
+        g.setStroke(new BasicStroke(1.5f));
+        g.draw(rock);
+        g.setColor(new Color(210, 210, 216));
+        g.drawLine(cx - 3, cy - 2, cx + 2, cy - 4);
+        g.setStroke(new BasicStroke(1f));
+    }
+
+    private void paintWoodIcon(Graphics2D g, int cx, int cy) {
+        Color bark  = new Color(120, 72, 30);
+        Color inner = new Color(190, 130, 70);
+        for (int i = 0; i < 2; i++) {
+            int ly = cy - 4 + i * 8;
+            g.setColor(bark);
+            g.fillRoundRect(cx - 9, ly, 18, 7, 6, 6);
+            g.setColor(inner);
+            g.fillOval(cx - 9, ly, 7, 7);
+            g.setColor(bark.darker());
+            g.drawOval(cx - 9, ly, 7, 7);
+        }
+    }
+
+    private void paintWheatIcon(Graphics2D g, int cx, int cy) {
+        Color grain = new Color(226, 178, 40);
+        g.setColor(grain);
+        g.setStroke(new BasicStroke(1.6f));
+        int[] dx = {-6, 0, 6};
+        for (int sx : dx) {
+            int topX = cx + sx / 2;
+            g.drawLine(cx + sx, cy + 7, topX, cy - 7);
+            for (int k = 0; k < 4; k++) {
+                int gy = cy - 6 + k * 3;
+                int gx = topX + (sx == 0 ? 0 : (sx > 0 ? 1 : -1)) * (k);
+                g.drawLine(gx, gy, gx - 3, gy - 2);
+                g.drawLine(gx, gy, gx + 3, gy - 2);
+            }
+        }
+        g.setStroke(new BasicStroke(1f));
+    }
+
+    private void paintIronIcon(Graphics2D g, int cx, int cy) {
+        Color ore   = new Color(95, 110, 200);
+        Color light = new Color(160, 175, 245);
+        int[][] gems = {{cx - 4, cy}, {cx + 4, cy + 2}};
+        for (int[] p : gems) {
+            int gx = p[0], gy = p[1];
+            GeneralPath d = new GeneralPath();
+            d.moveTo(gx, gy - 6);
+            d.lineTo(gx + 5, gy);
+            d.lineTo(gx, gy + 6);
+            d.lineTo(gx - 5, gy);
+            d.closePath();
+            g.setColor(ore);
+            g.fill(d);
+            g.setColor(new Color(40, 50, 110));
+            g.draw(d);
+            g.setColor(light);
+            g.drawLine(gx, gy - 5, gx - 2, gy);
+        }
+    }
+
+    private void paintDepletedIcon(Graphics2D g, int cx, int cy) {
+        g.setColor(new Color(90, 90, 90, 150));
+        g.fillOval(cx - 6, cy - 6, 12, 12);
+        g.setColor(new Color(60, 60, 60, 180));
+        g.drawOval(cx - 6, cy - 6, 12, 12);
+        g.drawLine(cx - 4, cy + 4, cx + 4, cy - 4);
     }
 
     private void paintBuildingIcon(Graphics2D g, Point2D c, Building b) {
@@ -235,7 +330,9 @@ public class HexMapView extends JPanel {
         animY    = p1.y();
         double dx = p2.x() - p1.x(), dy = p2.y() - p1.y();
         double dist = Math.sqrt(dx * dx + dy * dy);
-        double speed = 8.0;
+        final double speed = 8.0;
+
+        if (dist < 1e-6) { animUnit = null; done.run(); repaint(); return; }
         animDX = dx / dist * speed;
         animDY = dy / dist * speed;
         final double targetX = p2.x(), targetY = p2.y();
@@ -243,8 +340,10 @@ public class HexMapView extends JPanel {
         if (animTimer != null) animTimer.stop();
         animTimer = new Timer(14, e -> {
             animX += animDX; animY += animDY;
-            if (Math.abs(animX - targetX) < Math.abs(animDX)
-             && Math.abs(animY - targetY) < Math.abs(animDY)) {
+
+            double remaining = Math.hypot(targetX - animX, targetY - animY);
+            if (remaining <= speed) {
+                animX = targetX; animY = targetY;
                 animUnit = null;
                 animTimer.stop();
                 done.run();
@@ -312,15 +411,6 @@ public class HexMapView extends JPanel {
             case FOREST    -> new Color(34, 105, 36);
             case MOUNTAIN  -> new Color(115, 100, 90);
             case GRASSLAND -> new Color(75, 162, 60);
-        };
-    }
-
-    private Color resourceColor(ResourceType t) {
-        return switch (t) {
-            case FOOD  -> new Color(255, 215, 50);
-            case WOOD  -> new Color(139, 80, 20);
-            case STONE -> new Color(180, 180, 190);
-            case IRON  -> new Color(90, 100, 220);
         };
     }
 
