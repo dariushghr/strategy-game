@@ -32,6 +32,7 @@ public class GameWindow extends JFrame {
 
     private Unit    selected         = null;
     private boolean waitingForTarget = false;
+    private boolean animating        = false;
 
     public GameWindow(GameState state,
                       TurnController turnCtrl,
@@ -135,13 +136,15 @@ public class GameWindow extends JFrame {
     }
 
     private void handleClick(HexCell cell) {
+        if (animating) return;
 
         if (waitingForTarget && selected != null) {
-            unitCtrl.move(selected, cell);
+            List<HexCell> path = unitCtrl.path(selected, cell);
             mapView.clearHighlight();
             waitingForTarget = false;
-            if (selected.isAlive()) unitPanel.show(selected);
-            else { selected = null; unitPanel.clear(); }
+            if (!path.isEmpty()) {
+                animateAlong(selected, path, 0);
+            }
             return;
         }
 
@@ -164,10 +167,32 @@ public class GameWindow extends JFrame {
         unitPanel.clear();
     }
 
+    private void animateAlong(Unit unit, List<HexCell> path, int index) {
+        if (index >= path.size()) {
+            animating = false;
+            if (selected == unit) {
+                if (unit.isAlive()) unitPanel.show(unit);
+                else { selected = null; unitPanel.clear(); }
+            }
+            refresh();
+            return;
+        }
+
+        animating = true;
+        HexCell from = unit.getPosition();
+        HexCell to   = path.get(index);
+
+        mapView.animMove(unit, from, to, () -> {
+            unitCtrl.stepOnce(unit, to);
+            refresh();
+            animateAlong(unit, path, index + 1);
+        });
+    }
+
     public void refresh() {
         mapView.setMapData(state.getMap(), state.getFog());
         hud.refresh(state);
-        if (selected != null) {
+        if (selected != null && !animating) {
             if (selected.isAlive()) unitPanel.show(selected);
             else { selected = null; unitPanel.clear(); }
         }
