@@ -31,6 +31,19 @@ public class FogOfWar {
         }
     }
 
+    /** آشکار کردن کل نقشه؛ برای ابزار تست سناریوها. */
+    public void revealAll() {
+        for (int q = 0; q < map.getWidth(); q++) {
+            for (int r = 0; r < map.getHeight(); r++) {
+                HexCell cell = map.getCell(q, r);
+                if (cell == null) continue;
+                explored[q][r] = true;
+                visible[q][r]  = true;
+                cell.setExplored(true);
+            }
+        }
+    }
+
     private void reveal(HexCell center, int radius) {
         for (HexCell c : map.getCellsInRadius(center, radius)) {
             int q = c.getQ(), r = c.getR();
