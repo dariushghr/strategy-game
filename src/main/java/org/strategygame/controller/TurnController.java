@@ -1,130 +1,84 @@
 package org.strategygame.controller;
 
 import org.strategygame.model.GameState;
-import org.strategygame.model.building.*;
-import org.strategygame.model.map.HexCell;
+import org.strategygame.model.building.Building;
+import org.strategygame.model.command.TownHallCommand;
+import org.strategygame.model.disaster.DisasterEvent;
+import org.strategygame.model.disaster.DisasterType;
+import org.strategygame.model.event.NotificationKind;
 import org.strategygame.model.resource.ResourceStorage;
 import org.strategygame.model.resource.ResourceType;
-import org.strategygame.model.unit.*;
-import org.strategygame.model.upgrade.UpgradeType;
+import org.strategygame.model.season.Season;
+import org.strategygame.model.unit.Unit;
 import org.strategygame.view.GameWindow;
 
-import java.util.ArrayList;
-import java.util.List;
-
+/**
+ * ترتیب یک نوبت کامل. همه‌ی سیستم‌های بازی از همین یک مسیر جلو می‌روند تا
+ * ترتیب اثرها قابل توضیح و تکرارپذیر بماند:
+ *
+ * <pre>
+ * پایان نوبت بازیکن: تولید → نگهداری → مصرف غذا → صف تان هال → شادی
+ *                    → نوبت قبیله‌ها → نوبت خرس‌ها → اثرهای موقت
+ * شروع نوبت بعد:     شماره‌ی نوبت و فصل → تازه‌سازی AP → قرعه‌ی بلای طبیعی → فوگ
+ * </pre>
+ */
 public class TurnController {
 
-    private final GameState     state;
-    private final UnitController unitCtrl;
+    private final GameState    state;
+    private final GameServices services;
     private GameWindow window;
 
-    public TurnController(GameState state, UnitController unitCtrl) {
+    public TurnController(GameState state, GameServices services) {
         this.state    = state;
-        this.unitCtrl = unitCtrl;
+        this.services = services;
     }
 
     public void setWindow(GameWindow window) { this.window = window; }
 
     public void execute() {
-        refreshAP();
-        produceResources();
-        advanceProductionQueue();
+        // ---------------------------------------------------- پایان نوبت بازیکن
+        services.production().applyProduction(state);
         applyUpkeep();
         applyFoodConsumption();
+        advanceProductionQueue();
+        services.happiness().evaluateTurn(state);
 
-        state.getFog().update(state.getUnits(), state.getBuildings());
+        services.tribeTurn().executeTurn(state);
+        services.disaster().runBearTurn(state);
+
+        tickTemporaryEffects();
+        state.getStorage().trimOverflow();
+
+        // -------------------------------------------------------- شروع نوبت بعد
+        Season before = state.getSeason();
         state.nextTurn();
+        announceSeasonChange(before, state.getSeason());
 
-        if (window != null) window.refresh();
+        refreshAP();
+        rollDisaster();
+
+        services.tribe().updateDiscovery(state);
+        state.getFog().update(state.getUnits(), state.getBuildings());
+
+        if (window != null) window.onTurnAdvanced();
     }
 
-    private void refreshAP() {
-        for (Unit u : state.getUnits()) {
-            if (u.isAlive()) u.refreshAP();
-        }
-    }
-
-    private void produceResources() {
-        ResourceStorage storage = state.getStorage();
-        double mult = state.getMiningMultiplier();
-
-        for (Building b : state.getBuildings()) {
-            if (!b.isFunctional()) continue;
-            ResourceType rt = b.getResourceType();
-            if (rt == null) continue;
-            double m = (b instanceof TownHall) ? 1.0 : mult;
-            storage.add(rt, b.produce(m));
-        }
-
-        storage.add(ResourceType.WOOD, TownHall.SAFEGUARD_WOOD);
-    }
-
-    private void advanceProductionQueue() {
-        ProductionQueue queue = state.getTownHall().getQueue();
-        if (queue.isEmpty()) return;
-
-        if (queue.advance()) {
-            Object item = queue.take();
-            if (item instanceof UnitType type) {
-                spawnProducedUnit(type);
-            } else if (item instanceof UpgradeType type) {
-                applyUpgrade(type);
-            }
-        }
-    }
-
-    private void spawnProducedUnit(UnitType type) {
-        if (!state.canSpawnUnit()) return;
-
-        HexCell home = state.getTownHall().getLocation();
-        List<HexCell> neighbors = state.getMap().getNeighbors(home);
-        HexCell spot = neighbors.isEmpty() ? home : neighbors.getFirst();
-
-        Unit unit = switch (type) {
-            case EXPLORER        -> new Explorer();
-            case BUILDER         -> new Builder();
-            case WORKER          -> new Worker();
-            case BORDER_EXPANDER -> new BorderExpander();
-        };
-        state.spawn(unit, spot);
-    }
-
-    private void applyUpgrade(UpgradeType type) {
-        state.getDoneUpgrades().add(type);
-        switch (type) {
-            case STORAGE_UPGRADE_1, STORAGE_UPGRADE_2 -> state.getStorage().upgradeCapacity();
-            case PROFESSIONAL_TOOLS -> state.setMiningMultiplier(1.5);
-            case SETTLEMENT_TECH -> autoPlaceSettlement();
-            default -> {  }
-        }
-    }
-
-    private void autoPlaceSettlement() {
-        List<HexCell> candidates = new ArrayList<>();
-        for (HexCell c : state.getMap().getAllCells()) {
-            if (c.isInBorder() && !c.hasBuilding() && !c.hasResource()) candidates.add(c);
-        }
-        if (candidates.isEmpty()) return;
-
-        HexCell chosen = candidates.getFirst();
-        Building settlement = BuildingFactory.create(BuildingType.SETTLEMENT);
-        settlement.setLocation(chosen);
-        chosen.setBuilding(settlement);
-        state.addBuilding(settlement);
-        state.addUnitCap(Settlement.CAP_BONUS);
-        state.setSettlementUnlocked(true);
-    }
-
+    // ------------------------------------------------------------------ تولید
     private void applyUpkeep() {
         ResourceStorage storage = state.getStorage();
         for (Building b : state.getBuildings()) {
             if (!b.isFunctional()) continue;
+
             int[] upkeep = b.getType().getUpkeepCost();
             if (storage.canAffordAll(upkeep)) {
                 storage.deductAll(upkeep);
                 b.payUpkeep();
             } else {
                 b.missUpkeep();
+                if (b.isBroken()) {
+                    state.notify(NotificationKind.PRODUCTION,
+                            b.getType().getLabel() + " به‌خاطر نپرداختن نگهداری خراب شد");
+                }
             }
         }
     }
@@ -132,16 +86,76 @@ public class TurnController {
     private void applyFoodConsumption() {
         ResourceStorage storage = state.getStorage();
         int consumption = state.getUnits().size() * GameState.FOOD_PER_UNIT;
-        int available   = storage.get(ResourceType.FOOD);
+        boolean starving = storage.get(ResourceType.FOOD) < consumption;
 
-        boolean starving = available < consumption;
         storage.deduct(ResourceType.FOOD, consumption);
         state.setStarvation(starving);
 
-        if (starving) {
-            for (Unit u : state.getUnits()) {
-                if (u.isAlive()) u.spendAP(1);
-            }
+        if (!starving) return;
+        state.notify(NotificationKind.PRODUCTION, "قحطی! یونیت‌ها یک AP کمتر دارند");
+    }
+
+    /** یک نوبت از دستور فعال تان هال کم می‌کند و اثر آن را در زمان اتمام اعمال می‌کند. */
+    private void advanceProductionQueue() {
+        if (state.getTownHall() == null) return;
+
+        TownHallCommand done = state.getTownHall().getQueue().advanceTurn();
+        if (done == null) return;
+
+        String problem = done.validate(state);
+        if (problem != null) {
+            state.notify(NotificationKind.PRODUCTION,
+                    "«" + done.getLabel() + "» اجرا نشد: " + problem);
+            return;
         }
+        done.complete(state);
+    }
+
+    private void tickTemporaryEffects() {
+        for (Building b : state.getBuildings()) b.tickTemporaryEffects();
+    }
+
+    private void refreshAP() {
+        boolean starving = state.isStarvation();
+        for (Unit u : state.getUnits()) {
+            if (!u.isAlive()) continue;
+            u.refreshAP();
+            if (starving) u.spendAP(1);
+        }
+    }
+
+    // ------------------------------------------------------------ فصل و بلایا
+    private void announceSeasonChange(Season before, Season now) {
+        if (before == now) return;
+        state.notify(NotificationKind.SEASON,
+                "فصل به " + now.getLabel() + " تغییر کرد — " + now.getEffectText());
+    }
+
+    private void rollDisaster() {
+        DisasterEvent event = services.disaster().rollForTurn(state);
+        if (event == null || window == null) return;
+        window.onDisaster(event);
+    }
+
+    /** برای دیباگ: اجرای دستی یک بلای طبیعی بدون انتظار برای قرعه‌ی ۵٪. */
+    public DisasterEvent forceDisaster(DisasterType type) {
+        DisasterEvent event = services.disaster().trigger(state, type);
+        if (event != null && window != null) window.onDisaster(event);
+        return event;
+    }
+
+    /** برای دیباگ: پریدن به ابتدای یک فصل مشخص. */
+    public void forceSeason(Season season) {
+        state.forceSeason(season);
+        state.notify(NotificationKind.SEASON,
+                "فصل به‌صورت دستی روی " + season.getLabel() + " تنظیم شد");
+    }
+
+    public boolean canForce(DisasterType type) {
+        return switch (type) {
+            case EARTHQUAKE  -> !services.disaster().landCells(state).isEmpty();
+            case FLOOD       -> !services.disaster().floodCenters(state).isEmpty();
+            case BEAR_ATTACK -> !services.disaster().bearDens(state).isEmpty();
+        };
     }
 }

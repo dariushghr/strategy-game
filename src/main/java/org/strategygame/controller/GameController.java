@@ -10,7 +10,7 @@ import javax.swing.JOptionPane;
 public class GameController {
 
     private MainMenuView menu;
-    private GameWindow    window;
+    private GameWindow   window;
 
     public void showMenu() {
         menu = new MainMenuView();
@@ -20,14 +20,22 @@ public class GameController {
     }
 
     private void startGame() {
-        GameState state = new GameState();
+        GameState    state    = new GameState();
+        GameServices services = new GameServices();
+
         state.initialize();
+        services.tribe().spawnInitialTribes(state);
+        services.tribe().updateDiscovery(state);
 
-        UnitController     unitCtrl = new UnitController(state);
-        BuildingController bldCtrl  = new BuildingController(state);
-        TurnController     turnCtrl = new TurnController(state, unitCtrl);
+        UnitController     unitCtrl   = new UnitController(state, services);
+        BuildingController bldCtrl    = new BuildingController(state);
+        CombatController   combatCtrl = new CombatController(state, services);
+        TribeController    tribeCtrl  = new TribeController(state, services);
+        TradeController    tradeCtrl  = new TradeController(state, services);
+        TurnController     turnCtrl   = new TurnController(state, services);
 
-        window = new GameWindow(state, turnCtrl, unitCtrl, bldCtrl);
+        window = new GameWindow(state, turnCtrl, unitCtrl, bldCtrl,
+                combatCtrl, tribeCtrl, tradeCtrl);
         turnCtrl.setWindow(window);
         window.setVisible(true);
 
