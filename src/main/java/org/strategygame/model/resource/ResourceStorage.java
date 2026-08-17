@@ -1,21 +1,25 @@
 package org.strategygame.model.resource;
 
+import org.strategygame.config.GameConfig;
+
 import java.util.EnumMap;
 import java.util.Map;
 
+/**
+ * انبار امپراتوری. ظرفیت پایه از سطح تان هال می‌آید و ارتقاهای انبار
+ * روی آن اضافه می‌شوند. هیچ منبعی هرگز از ظرفیت بیشتر نمی‌شود.
+ */
 public class ResourceStorage {
 
-    private static final int BASE_CAPACITY = 200;
-    private static final int UPGRADE_BONUS  = 150;
+    private static final int UPGRADE_BONUS = 150;
 
-    private final Map<ResourceType, Integer> current  = new EnumMap<>(ResourceType.class);
-    private final Map<ResourceType, Integer> capacity = new EnumMap<>(ResourceType.class);
+    private final Map<ResourceType, Integer> current = new EnumMap<>(ResourceType.class);
+
+    private int levelCapacity = GameConfig.STORAGE_CAPACITY_BY_LEVEL[0];
+    private int bonusCapacity = 0;
 
     public ResourceStorage() {
-        for (ResourceType t : ResourceType.values()) {
-            current.put(t, 0);
-            capacity.put(t, BASE_CAPACITY);
-        }
+        for (ResourceType t : ResourceType.values()) current.put(t, 0);
 
         current.put(ResourceType.FOOD,  30);
         current.put(ResourceType.WOOD,  20);
@@ -28,23 +32,28 @@ public class ResourceStorage {
         return v == null ? 0 : v;
     }
 
-    public int getCapacity(ResourceType t) {
-        Integer v = capacity.get(t);
-        return v == null ? 0 : v;
+    public int getCapacity(ResourceType t) { return levelCapacity + bonusCapacity; }
+
+    /** جای خالی انبار برای این منبع. */
+    public int freeSpace(ResourceType t) { return Math.max(0, getCapacity(t) - get(t)); }
+
+    /**
+     * افزودن منبع با رعایت ظرفیت.
+     * @return مقداری که به‌خاطر پر بودن انبار هدر رفت.
+     */
+    public int add(ResourceType t, int amount) {
+        if (amount <= 0) return 0;
+        int space  = freeSpace(t);
+        int stored = Math.min(amount, space);
+        current.put(t, get(t) + stored);
+        return amount - stored;
     }
 
-    public void add(ResourceType t, int amount) {
-        int next = Math.min(get(t) + amount, getCapacity(t));
-        current.put(t, next);
-    }
-
-    public boolean canAfford(ResourceType t, int amount) {
-        return get(t) >= amount;
-    }
+    public boolean canAfford(ResourceType t, int amount) { return get(t) >= amount; }
 
     public boolean canAffordAll(int[] foodWoodStoneIron) {
         ResourceType[] types = ResourceType.values();
-        for (int i = 0; i < types.length; i++) {
+        for (int i = 0; i < types.length && i < foodWoodStoneIron.length; i++) {
             if (get(types[i]) < foodWoodStoneIron[i]) return false;
         }
         return true;
@@ -56,14 +65,26 @@ public class ResourceStorage {
 
     public void deductAll(int[] foodWoodStoneIron) {
         ResourceType[] types = ResourceType.values();
-        for (int i = 0; i < types.length; i++) {
+        for (int i = 0; i < types.length && i < foodWoodStoneIron.length; i++) {
             deduct(types[i], foodWoodStoneIron[i]);
         }
     }
 
+    /** ظرفیت پایه را با سطح تان هال هم‌تراز می‌کند. */
+    public void setLevelCapacity(int capacity) {
+        this.levelCapacity = Math.max(0, capacity);
+        trimOverflow();
+    }
+
     public void upgradeCapacity() {
+        bonusCapacity += UPGRADE_BONUS;
+    }
+
+    /** حذف سرریز در پایان نوبت. */
+    public void trimOverflow() {
         for (ResourceType t : ResourceType.values()) {
-            capacity.put(t, capacity.get(t) + UPGRADE_BONUS);
+            int cap = getCapacity(t);
+            if (get(t) > cap) current.put(t, cap);
         }
     }
 }
