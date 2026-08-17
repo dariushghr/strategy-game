@@ -1,52 +1,36 @@
 package org.strategygame.model.building;
 
-import org.strategygame.model.resource.ResourceType;
+/**
+ * سازه‌ی تولیدی عمومی؛ ظرفیت کارگر و میزان تولید را از روی
+ * {@link BuildingType} برمی‌دارد تا عددی که به بازیکن نشان داده می‌شود
+ * دقیقا همان عددی باشد که در بازی تولید می‌شود.
+ */
+class ProductionBuilding extends Building {
 
-class LumberMill extends Building {
-    public LumberMill() { super(3); }
-    @Override public int produce(double m)       { return (int) (workerCount() * 3 * m); }
-    @Override public ResourceType getResourceType(){ return ResourceType.WOOD; }
-    @Override public BuildingType getType()       { return BuildingType.LUMBER_MILL; }
+    ProductionBuilding(BuildingType type) { super(type); }
+
+    @Override public int produce(double multiplier) {
+        return (int) Math.floor(workerCount() * getType().getYieldPerWorker() * multiplier);
+    }
 }
 
-class StoneMine extends Building {
-    public StoneMine() { super(3); }
-    @Override public int produce(double m)       { return (int) (workerCount() * 2 * m); }
-    @Override public ResourceType getResourceType(){ return ResourceType.STONE; }
-    @Override public BuildingType getType()       { return BuildingType.STONE_MINE; }
-}
+/** سازه‌ای که خودش منبعی تولید نمی‌کند (بازار، بنای یادبود، پاسگاه و ...). */
+class StaticBuilding extends Building {
 
-class IronMine extends Building {
-    public IronMine() { super(2); }
-    @Override public int produce(double m)       { return (int) (workerCount() * 1 * m); }
-    @Override public ResourceType getResourceType(){ return ResourceType.IRON; }
-    @Override public BuildingType getType()       { return BuildingType.IRON_MINE; }
-}
+    StaticBuilding(BuildingType type) { super(type); }
 
-class Farm extends Building {
-    public Farm() { super(4); }
-    @Override public int produce(double m)       { return (int) (workerCount() * 4 * m); }
-    @Override public ResourceType getResourceType(){ return ResourceType.FOOD; }
-    @Override public BuildingType getType()       { return BuildingType.FARM; }
-}
-
-class Stable extends Building {
-    public Stable() { super(2); }
-    @Override public int produce(double m)       { return (int) (workerCount() * 3 * m); }
-    @Override public ResourceType getResourceType(){ return ResourceType.FOOD; }
-    @Override public BuildingType getType()       { return BuildingType.STABLE; }
+    @Override public int produce(double multiplier) { return 0; }
 }
 
 public class BuildingFactory {
+
     public static Building create(BuildingType t) {
         return switch (t) {
-            case LUMBER_MILL -> new LumberMill();
-            case STONE_MINE  -> new StoneMine();
-            case IRON_MINE   -> new IronMine();
-            case FARM        -> new Farm();
-            case STABLE      -> new Stable();
-            case SETTLEMENT  -> new Settlement();
-            case TOWN_HALL   -> new TownHall();
+            case SETTLEMENT -> new Settlement();
+            case TOWN_HALL  -> new TownHall();
+            case BAZAAR     -> new Bazaar();
+            case MONUMENT, TRADING_POST, OUTPOST -> new StaticBuilding(t);
+            default         -> new ProductionBuilding(t);
         };
     }
 }
