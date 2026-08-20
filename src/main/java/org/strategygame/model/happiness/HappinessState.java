@@ -17,6 +17,17 @@ public class HappinessState {
     private final Set<String>  firedEvents = new HashSet<>();
     private final List<String>  history    = new ArrayList<>();
 
+    public Set<String> getFiredEvents() { return firedEvents; }
+
+    public void restore(int value, Set<String> fired, List<String> history) {
+        this.value = value;
+        this.level = HappinessLevel.of(value);
+        this.firedEvents.clear();
+        if (fired != null) this.firedEvents.addAll(fired);
+        this.history.clear();
+        if (history != null) this.history.addAll(history);
+    }
+
     public int getValue()              { return value; }
     public HappinessLevel getLevel()   { return level; }
     public List<String> getHistory()   { return history; }

@@ -27,4 +27,8 @@ public class TribeCamp implements Structure {
     @Override public void takeDamage(int amount) {
         if (amount > 0) hp = Math.max(0, hp - amount);
     }
+
+    public void restoreHp(int saved) {
+        this.hp = Math.max(0, Math.min(maxHp, saved));
+    }
 }

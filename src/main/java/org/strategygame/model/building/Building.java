@@ -11,7 +11,7 @@ import java.util.UUID;
 
 public abstract class Building implements Structure {
 
-    private final String       id;
+    private String             id;
     private final BuildingType type;
     private HexCell            location;
     private final List<Worker> workers = new ArrayList<>();
@@ -65,6 +65,9 @@ public abstract class Building implements Structure {
     public boolean canTakeWorker()  { return isFunctional() && workers.size() < maxWorkers; }
 
     public void addWorker(Worker w)    { if (canTakeWorker()) workers.add(w); }
+    public void restoreAddWorker(Worker w) {
+        if (w != null && !workers.contains(w)) workers.add(w);
+    }
     public void removeWorker(Worker w) { workers.remove(w); }
 
     /** آزاد کردن همه‌ی کارگرها؛ در تخریب و نابودی سازه لازم است. */
@@ -79,6 +82,7 @@ public abstract class Building implements Structure {
     /** آیا در این نوبت با این سازه معامله انجام شده است. */
     public boolean hasTradedOn(int turn) { return lastTradeTurn == turn; }
     public void markTraded(int turn)     { this.lastTradeTurn = turn; }
+    public int getLastTradeTurn()        { return lastTradeTurn; }
 
     public void payUpkeep()  { missedUpkeep = 0; }
     public void missUpkeep() { if (++missedUpkeep >= 3) functional = false; }
@@ -112,4 +116,16 @@ public abstract class Building implements Structure {
     public int getMinimumHp() { return 0; }
 
     public abstract int produce(double multiplier);
+
+    /** بازگرداندن وضعیت ذخیره‌شده؛ فقط از مسیر Load. */
+    public void restoreSaved(String id, int hp, boolean functional, int missedUpkeep,
+                             int disabledTurns, int lastTradeTurn, int defense) {
+        if (id != null && !id.isBlank()) this.id = id;
+        this.hp = Math.max(getMinimumHp(), Math.min(maxHp, hp));
+        this.functional = functional;
+        this.missedUpkeep = Math.max(0, missedUpkeep);
+        this.disabledTurnsLeft = Math.max(0, disabledTurns);
+        this.lastTradeTurn = lastTradeTurn;
+        this.defense = Math.max(0, defense);
+    }
 }

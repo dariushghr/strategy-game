@@ -47,10 +47,40 @@ public class RandomService {
     /**
      * وضعیت تصادفی را به یک نقطه‌ی مشخص برمی‌گرداند؛ برای بازگرداندن بازی
      * ذخیره‌شده به همان مسیر تصادفی قبلی.
+     * توجه: {@code java.util.Random.nextInt} و {@code nextDouble} مقدار متفاوتی
+     * از جریان تصادفی مصرف می‌کنند، بنابراین بازپخش فقط با {@code nextDouble}
+     * دقیق نیست. برای Load از {@link #snapshot}/{@link #restoreSnapshot} استفاده شود.
      */
     public void restoreTo(long targetCallCount) {
         random    = new Random(seed);
         callCount = 0;
         while (callCount < targetCallCount) nextDouble();
+    }
+
+    /** تصویر باینری {@link Random} برای ذخیرهٔ دقیق جریان تصادفی. */
+    public byte[] snapshot() {
+        try {
+            var out = new java.io.ByteArrayOutputStream();
+            try (var oos = new java.io.ObjectOutputStream(out)) {
+                oos.writeObject(random);
+            }
+            return out.toByteArray();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("نمی‌توان وضعیت تصادفی را ذخیره کرد", e);
+        }
+    }
+
+    public void restoreSnapshot(byte[] data) {
+        if (data == null || data.length == 0) return;
+        try (var ois = new java.io.ObjectInputStream(new java.io.ByteArrayInputStream(data))) {
+            this.random = (Random) ois.readObject();
+        } catch (java.io.IOException | ClassNotFoundException e) {
+            throw new IllegalStateException("نمی‌توان وضعیت تصادفی را بارگذاری کرد", e);
+        }
+    }
+
+    public void restoreSnapshot(byte[] data, long savedCallCount) {
+        restoreSnapshot(data);
+        this.callCount = Math.max(0, savedCallCount);
     }
 }

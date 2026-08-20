@@ -18,6 +18,15 @@ public class NotificationCenter {
         if (history.size() > MAX_HISTORY) history.removeFirst();
     }
 
+    /** بازگرداندن تاریخچه بدون صف خوانده‌نشده؛ بارگذاری نباید اعلان‌های قدیمی را دوباره نشان دهد. */
+    public void restoreHistory(List<Notification> saved) {
+        history.clear();
+        pending.clear();
+        if (saved == null) return;
+        history.addAll(saved);
+        while (history.size() > MAX_HISTORY) history.removeFirst();
+    }
+
     public List<Notification> getHistory() { return history; }
 
     public boolean hasPending() { return !pending.isEmpty(); }

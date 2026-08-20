@@ -27,6 +27,7 @@ public class Bear extends CombatUnit {
     public boolean hasAttackedThisTurn()      { return attackedThisTurn; }
     public void markAttacked()                { this.attackedThisTurn = true; }
     public void resetTurnFlags()              { this.attackedThisTurn = false; }
+    public void restoreAttackedThisTurn(boolean v) { this.attackedThisTurn = v; }
 
     /** آسیب مستقیم حمله‌ی خرس به یونیت. */
     public int getAttackDamage() { return GameConfig.BEAR_ATTACK; }

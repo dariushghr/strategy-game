@@ -12,7 +12,7 @@ import java.util.UUID;
 /** یک قبیله‌ی بی‌طرف روی نقشه. */
 public class Tribe {
 
-    private final String    id = UUID.randomUUID().toString();
+    private String          id = UUID.randomUUID().toString();
     private final String    name;
     private final TribeType type;
     private final HexCell   campHex;
@@ -73,6 +73,30 @@ public class Tribe {
     public void setDiscovered(boolean v)   { this.discovered = v; }
     public void setTrespassWarned(boolean v){ this.trespassWarned = v; }
     public void setDockDiscount(boolean v) { this.dockDiscount = v; }
+
+    public void restoreId(String savedId) {
+        if (savedId != null && !savedId.isBlank()) this.id = savedId;
+    }
+
+    public void restoreFlags(boolean discovered, boolean atWar, boolean allied, boolean defeated) {
+        this.discovered = discovered;
+        this.atWar      = atWar;
+        this.allied     = allied;
+        this.defeated   = defeated;
+    }
+
+    public void restoreTimers(int lastFail, int lastOffer, int lastGuard, int lastTrade,
+                              int nearbyKills, double tradeBonus, boolean dockDiscount,
+                              boolean trespassWarned) {
+        this.lastMissionFailTurn  = lastFail;
+        this.lastMissionOfferTurn = lastOffer;
+        this.lastGuardTurn        = lastGuard;
+        this.lastTradeTurn        = lastTrade;
+        this.nearbyEnemyKills     = Math.max(0, nearbyKills);
+        this.tradeRateBonus       = tradeBonus;
+        this.dockDiscount         = dockDiscount;
+        this.trespassWarned       = trespassWarned;
+    }
 
     // -------------------------------------------------------------- رابطه
     /**
@@ -144,16 +168,19 @@ public class Tribe {
 
     public int getLastMissionOfferTurn()            { return lastMissionOfferTurn; }
     public void setLastMissionOfferTurn(int turn)   { this.lastMissionOfferTurn = turn; }
+    public int getLastMissionFailTurn()             { return lastMissionFailTurn; }
 
     public void addNearbyEnemyKill() { nearbyEnemyKills++; }
 
     // -------------------------------------------------------------- تجارت
     public double getTradeRate() { return type.getTradeRate() + tradeRateBonus; }
+    public double getTradeRateBonus() { return tradeRateBonus; }
 
     public void addTradeRateBonus(double bonus) { this.tradeRateBonus += bonus; }
 
     public boolean hasTradedOn(int turn) { return lastTradeTurn == turn; }
     public void markTraded(int turn)     { this.lastTradeTurn = turn; }
+    public int getLastTradeTurn()        { return lastTradeTurn; }
 
     // ------------------------------------------------------------ نگهبان‌ها
     public int getLastGuardTurn()          { return lastGuardTurn; }

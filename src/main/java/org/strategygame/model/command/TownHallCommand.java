@@ -63,6 +63,11 @@ public abstract class TownHallCommand {
         if (!effectApplied) cancelled = true;
     }
 
+    /** بازگرداندن تایمر صف از فایل ذخیره. */
+    public void restoreTurnsLeft(int left) {
+        this.turnsLeft = Math.max(0, Math.min(totalTurns, left));
+    }
+
     @Override public String toString() {
         return getLabel() + " (" + turnsLeft + "/" + totalTurns + " نوبت)";
     }

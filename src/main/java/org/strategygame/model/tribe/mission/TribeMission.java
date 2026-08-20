@@ -43,6 +43,12 @@ public abstract class TribeMission {
     public void grantSpecialReward(GameState state, Tribe tribe) { }
 
     // ------------------------------------------------------------ چرخه‌ی حالت
+    public void restoreRuntime(MissionState saved, int turnsLeft, boolean rewardClaimed) {
+        if (saved != null) this.state = saved;
+        this.turnsLeft = Math.max(0, turnsLeft);
+        this.rewardClaimed = rewardClaimed;
+    }
+
     public MissionState getState() { return state; }
     public int getDeadlineTurns()  { return deadlineTurns; }
     public int getTurnsLeft()      { return turnsLeft; }

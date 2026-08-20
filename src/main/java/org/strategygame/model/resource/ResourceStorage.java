@@ -27,6 +27,20 @@ public class ResourceStorage {
         current.put(ResourceType.IRON,   0);
     }
 
+    public int getLevelCapacity() { return levelCapacity; }
+    public int getBonusCapacity() { return bonusCapacity; }
+
+    public void restore(int levelCapacity, int bonusCapacity, int[] amounts) {
+        this.levelCapacity = Math.max(0, levelCapacity);
+        this.bonusCapacity = Math.max(0, bonusCapacity);
+        ResourceType[] types = ResourceType.values();
+        for (int i = 0; i < types.length; i++) {
+            int v = amounts != null && i < amounts.length ? Math.max(0, amounts[i]) : 0;
+            current.put(types[i], v);
+        }
+        trimOverflow();
+    }
+
     public int get(ResourceType t) {
         Integer v = current.get(t);
         return v == null ? 0 : v;

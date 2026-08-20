@@ -18,6 +18,10 @@ public class ResourceDeposit {
     public int getMax()            { return max; }
     public boolean isDepleted()    { return remaining <= 0; }
 
+    public void restoreRemaining(int remaining) {
+        this.remaining = Math.max(0, Math.min(max, remaining));
+    }
+
     public int extract(int requested) {
         int actual = Math.min(requested, remaining);
         remaining -= actual;
