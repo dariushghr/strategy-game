@@ -17,5 +17,28 @@
 .DS_Store
 Thumbs.db
 
+# Build output
+/target/
+/out/
+/bin/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# OS
+.DS_Store
+Thumbs.db
+
 # Logs
 *.log
+
+# Local save files
+/saves/
+/.strategygame/
