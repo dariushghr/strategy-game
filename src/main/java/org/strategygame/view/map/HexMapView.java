@@ -297,6 +297,10 @@ public class HexMapView extends JPanel {
     // -------------------------------------------------------------- بلایا
     /** انیمیشن بلای طبیعی؛ فقط برای رویدادهای داخل دید بازیکن صدا زده می‌شود. */
     public void playDisaster(DisasterEvent event) {
+        playDisaster(event, null);
+    }
+
+    public void playDisaster(DisasterEvent event, Runnable done) {
         this.disaster = event;
         this.disasterFramesLeft = 34;
 
@@ -316,6 +320,7 @@ public class HexMapView extends JPanel {
                 disaster = null;
                 shakeX = 0; shakeY = 0;
                 disasterTimer.stop();
+                if (done != null) done.run();
             }
             repaint();
         });

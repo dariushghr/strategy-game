@@ -53,6 +53,13 @@ public class FogOfWar {
         }
     }
 
+    public void restoreExplored(int q, int r, boolean value) {
+        if (!inBounds(q, r)) return;
+        explored[q][r] = value;
+        HexCell cell = map.getCell(q, r);
+        if (cell != null) cell.setExplored(value);
+    }
+
     public boolean isExplored(int q, int r) {
         return inBounds(q, r) && explored[q][r];
     }

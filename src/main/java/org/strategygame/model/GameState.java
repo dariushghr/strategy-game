@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * ریشه‌ی دامنه‌ی بازی. تمام وضعیت بازی اینجا نگه داشته می‌شود و هیچ ارجاعی
@@ -34,6 +35,7 @@ public class GameState {
     public static final int FOOD_PER_UNIT = 1;
 
     private final RandomService random;
+    private String gameId = UUID.randomUUID().toString();
 
     private int turn = 1;
     private final ResourceStorage storage = new ResourceStorage();
@@ -130,7 +132,43 @@ public class GameState {
 
     // ------------------------------------------------------------ دسترسی پایه
     public RandomService getRandom()             { return random; }
+    public String getGameId()                    { return gameId; }
     public int getTurn()                         { return turn; }
+
+    /** اتصال نقشهٔ ذخیره‌شده بدون اجرای مجدد تولیدکنندهٔ نقشه. */
+    public void attachWorld(HexMap map) {
+        this.map = map;
+        this.fog = new FogOfWar(map);
+    }
+
+    public void setTownHall(TownHall hall) { this.townHall = hall; }
+
+    public void restoreMeta(String gameId, int turn, Season season, int unitCap,
+                            boolean settlementUnlocked, boolean starvation, boolean dockDiscount) {
+        if (gameId != null && !gameId.isBlank()) this.gameId = gameId;
+        this.turn = Math.max(1, turn);
+        this.season = season != null ? season : Season.forTurn(this.turn);
+        this.unitCap = Math.max(1, unitCap);
+        this.settlementUnlocked = settlementUnlocked;
+        this.starvation = starvation;
+        this.dockDiscount = dockDiscount;
+    }
+
+    public Map<String, Integer> getBearDenCooldown() { return bearDenCooldown; }
+
+    public void restoreBearDenCooldown(Map<String, Integer> saved) {
+        bearDenCooldown.clear();
+        if (saved != null) bearDenCooldown.putAll(saved);
+    }
+
+    /** قرار دادن یونیت ذخیره‌شده روی هکس بدون منطق اسپاون جدید. */
+    public void restorePlaceUnit(Unit unit, HexCell cell) {
+        if (unit == null || cell == null) return;
+        unit.setPosition(cell);
+        cell.addUnit(unit);
+        if (unit.getOwner() == Owner.PLAYER) units.add(unit);
+        else if (unit instanceof Bear bear)  bears.add(bear);
+    }
     public void nextTurn()                       { turn++; updateSeason(); }
     public ResourceStorage getStorage()          { return storage; }
     public HexMap getMap()                       { return map; }

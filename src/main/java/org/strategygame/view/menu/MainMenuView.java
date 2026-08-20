@@ -5,12 +5,12 @@ import java.awt.*;
 import java.awt.event.*;
 
 public class MainMenuView extends JFrame {
-    private Runnable startCB, exitCB;
+    private Runnable startCB, loadCB, exitCB;
 
     public MainMenuView() {
         setTitle("بازی استراتژیک");
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-        setSize(420, 320);
+        setSize(420, 380);
         setLocationRelativeTo(null);
         setResizable(false);
 
@@ -43,10 +43,14 @@ public class MainMenuView extends JFrame {
             if (startCB != null) startCB.run();
         }), gc);
 
-        gc.gridy = 2; bg.add(menuBtn("تنظیمات", new Color(55, 75, 110), e ->
+        gc.gridy = 2; bg.add(menuBtn("بارگذاری", new Color(40, 90, 110), e -> {
+            if (loadCB != null) loadCB.run();
+        }), gc);
+
+        gc.gridy = 3; bg.add(menuBtn("تنظیمات", new Color(55, 75, 110), e ->
                 new SettingsView(MainMenuView.this).setVisible(true)), gc);
 
-        gc.gridy = 3; bg.add(menuBtn("خروج", new Color(110, 40, 40), e -> {
+        gc.gridy = 4; bg.add(menuBtn("خروج", new Color(110, 40, 40), e -> {
             if (exitCB != null) exitCB.run();
         }), gc);
 
@@ -74,5 +78,6 @@ public class MainMenuView extends JFrame {
     }
 
     public void setStartCB(Runnable r) { this.startCB = r; }
+    public void setLoadCB(Runnable r)  { this.loadCB  = r; }
     public void setExitCB(Runnable r)  { this.exitCB  = r; }
 }

@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public abstract class Unit implements Attackable {
 
-    private final String id;
+    private String id;
     private HexCell position;
     private int currentAP;
     private final int maxAP;
@@ -74,6 +74,16 @@ public abstract class Unit implements Attackable {
     }
 
     public void heal(int amount) { hp = Math.min(maxHp, hp + Math.max(0, amount)); }
+
+    /** بازگرداندن هویت و وضعیت ذخیره‌شده؛ فقط از مسیر Load صدا زده می‌شود. */
+    public void restoreSaved(String id, int hp, int ap, boolean alive, Owner owner, int apPenalty) {
+        if (id != null && !id.isBlank()) this.id = id;
+        this.hp = Math.max(0, Math.min(maxHp, hp));
+        this.currentAP = Math.max(0, ap);
+        this.alive = alive && this.hp > 0;
+        if (owner != null) this.owner = owner;
+        setApPenalty(apPenalty);
+    }
 
     /** یونیت‌های غیرنظامی؛ در اولویت هدف‌گیری حیوانات وحشی اول هستند. */
     public boolean isMilitary() { return false; }

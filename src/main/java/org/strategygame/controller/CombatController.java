@@ -3,6 +3,7 @@ package org.strategygame.controller;
 import org.strategygame.common.ActionResult;
 import org.strategygame.model.GameState;
 import org.strategygame.model.combat.CombatResult;
+import org.strategygame.model.event.CombatResolvedEvent;
 import org.strategygame.model.map.HexCell;
 import org.strategygame.model.tribe.Tribe;
 import org.strategygame.model.unit.Owner;
@@ -12,6 +13,8 @@ public class CombatController {
 
     private final GameState    state;
     private final GameServices services;
+
+    private CombatResult lastResult;
 
     public CombatController(GameState state, GameServices services) {
         this.state    = state;
@@ -32,6 +35,8 @@ public class CombatController {
 
         Tribe defender = tribeDefending(to);
         CombatResult result = services.combat().attack(state, from, to);
+        lastResult = result;
+        services.events().publish(new CombatResolvedEvent(result));
 
         StringBuilder report = new StringBuilder(result.report());
 
@@ -52,8 +57,12 @@ public class CombatController {
             return ActionResult.fail("روی این یال دیواری وجود ندارد");
 
         CombatResult result = services.combat().attackWall(state, from, to);
+        lastResult = result;
+        services.events().publish(new CombatResolvedEvent(result));
         return ActionResult.ok(result.report());
     }
+
+    public CombatResult lastResult() { return lastResult; }
 
     public boolean hasWallBetween(HexCell a, HexCell b) {
         return state.getMap().getWall(a, b) != null;

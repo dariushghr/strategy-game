@@ -3,6 +3,7 @@ package org.strategygame.view;
 import org.strategygame.common.ActionResult;
 import org.strategygame.controller.BuildingController;
 import org.strategygame.controller.CombatController;
+import org.strategygame.controller.SaveController;
 import org.strategygame.controller.TradeController;
 import org.strategygame.controller.TribeController;
 import org.strategygame.controller.TurnController;
@@ -19,10 +20,13 @@ import org.strategygame.model.unit.Explorer;
 import org.strategygame.model.unit.MilitaryUnit;
 import org.strategygame.model.unit.Unit;
 import org.strategygame.model.unit.Worker;
+import org.strategygame.save.SaveSlot;
 import org.strategygame.view.hud.HUDView;
 import org.strategygame.view.map.HexMapView;
+import org.strategygame.view.panel.CombatDialog;
 import org.strategygame.view.panel.DebugPanel;
 import org.strategygame.view.panel.NotificationPanel;
+import org.strategygame.view.panel.SavePanel;
 import org.strategygame.view.panel.TownHallPanel;
 import org.strategygame.view.panel.TradePanel;
 import org.strategygame.view.panel.TribePanel;
@@ -50,6 +54,8 @@ public class GameWindow extends JFrame {
     private final CombatController   combatCtrl;
     private final TribeController    tribeCtrl;
     private final TradeController    tradeCtrl;
+    private final SaveController     saveCtrl;
+    private final java.util.function.Consumer<SaveSlot> onLoadSlot;
 
     private final HexMapView    mapView   = new HexMapView();
     private final HUDView       hud       = new HUDView();
@@ -64,6 +70,7 @@ public class GameWindow extends JFrame {
     private Unit      selected  = null;
     private ClickMode clickMode = ClickMode.SELECT;
     private boolean   animating = false;
+    private BusyReason busy     = BusyReason.NONE;
 
     public GameWindow(GameState state,
                       TurnController turnCtrl,
@@ -71,7 +78,9 @@ public class GameWindow extends JFrame {
                       BuildingController bldCtrl,
                       CombatController combatCtrl,
                       TribeController tribeCtrl,
-                      TradeController tradeCtrl) {
+                      TradeController tradeCtrl,
+                      SaveController saveCtrl,
+                      java.util.function.Consumer<SaveSlot> onLoadSlot) {
         this.state      = state;
         this.turnCtrl   = turnCtrl;
         this.unitCtrl   = unitCtrl;
@@ -79,6 +88,8 @@ public class GameWindow extends JFrame {
         this.combatCtrl = combatCtrl;
         this.tribeCtrl  = tribeCtrl;
         this.tradeCtrl  = tradeCtrl;
+        this.saveCtrl   = saveCtrl;
+        this.onLoadSlot = onLoadSlot;
 
         setTitle("بازی استراتژیک");
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
@@ -125,6 +136,7 @@ public class GameWindow extends JFrame {
     // ------------------------------------------------------------------- HUD
     private void bindHud() {
         hud.setOnEndTurn(() -> {
+            if (isBusy()) return;
             if (state.idleUnitsWithAP().isEmpty()) doEndTurn();
             else hud.showIdleWarning(this::doEndTurn);
         });
@@ -135,6 +147,7 @@ public class GameWindow extends JFrame {
         hud.setOnTrade(() -> tradePanel.open(null));
         hud.setOnLog(logPanel::open);
         hud.setOnDebug(debugPanel::open);
+        hud.setOnSave(this::openSavePanel);
         mapView.setCellClickListener(this::handleClick);
     }
 
@@ -355,7 +368,7 @@ public class GameWindow extends JFrame {
 
     // ------------------------------------------------------- کلیک روی نقشه
     private void handleClick(HexCell cell) {
-        if (animating) return;
+        if (isBusy()) return;
 
         switch (clickMode) {
             case MOVE   -> { doMove(cell);   return; }
@@ -409,7 +422,13 @@ public class GameWindow extends JFrame {
                 : combatCtrl.attackWall(from, cell);
 
         hud.showMessage(result.message(), result.success());
-        report(result, result.success() ? "نتیجه نبرد" : "حمله انجام نشد");
+        if (result.success() && combatCtrl.lastResult() != null) {
+            setBusy(BusyReason.COMBAT);
+            CombatDialog.show(this, combatCtrl.lastResult());
+            setBusy(BusyReason.NONE);
+        } else {
+            report(result, "حمله انجام نشد");
+        }
         refresh();
     }
 
@@ -465,7 +484,7 @@ public class GameWindow extends JFrame {
     // ------------------------------------------------------------ انیمیشن
     private void animateAlong(Unit unit, List<HexCell> path, int index) {
         if (index >= path.size()) {
-            animating = false;
+            setAnimating(false);
             if (selected == unit) {
                 if (unit.isAlive()) unitPanel.show(unit);
                 else clearSelection();
@@ -474,7 +493,7 @@ public class GameWindow extends JFrame {
             return;
         }
 
-        animating = true;
+        setAnimating(true);
         HexCell from = unit.getPosition();
         HexCell to   = path.get(index);
 
@@ -482,7 +501,7 @@ public class GameWindow extends JFrame {
             boolean moved = unitCtrl.stepOnce(unit, to);
             refresh();
             if (!moved) {
-                animating = false;
+                setAnimating(false);
                 hud.showMessage("حرکت نیمه‌کاره ماند", false);
                 refresh();
                 return;
@@ -507,7 +526,10 @@ public class GameWindow extends JFrame {
     /** بلای طبیعی: اگر داخل دید بازیکن باشد انیمیشن، وگرنه فقط گزارش. */
     public void onDisaster(DisasterEvent event) {
         if (event == null) return;
-        if (event.isVisible()) mapView.playDisaster(event);
+        if (event.isVisible()) {
+            setBusy(BusyReason.DISASTER);
+            mapView.playDisaster(event, () -> setBusy(BusyReason.NONE));
+        }
         hud.showMessage(event.headline(), false);
         JOptionPane.showMessageDialog(this, event.report(),
                 event.getType().getLabel(), JOptionPane.WARNING_MESSAGE);
@@ -532,8 +554,54 @@ public class GameWindow extends JFrame {
     }
 
     private void doEndTurn() {
-        clearSelection();
-        turnCtrl.execute();
+        if (isBusy()) return;
+        setBusy(BusyReason.END_TURN);
+        try {
+            clearSelection();
+            turnCtrl.execute();
+        } finally {
+            setBusy(BusyReason.NONE);
+        }
+    }
+
+    private void openSavePanel() {
+        if (isBusy()) {
+            hud.showMessage(busyMessage(), false);
+            return;
+        }
+        Object[] options = {"ذخیره", "بارگذاری", "انصراف"};
+        int choice = JOptionPane.showOptionDialog(this, "ذخیره یا بارگذاری بازی؟",
+                "ذخیره / بارگذاری", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+                null, options, options[0]);
+        if (choice == 0) {
+            new SavePanel(this, saveCtrl, SavePanel.Mode.SAVE, slot -> {
+                var result = saveCtrl.save(slot);
+                hud.showMessage(result.message(), result.success());
+            }).setVisible(true);
+        } else if (choice == 1) {
+            new SavePanel(this, saveCtrl, SavePanel.Mode.LOAD, slot -> {
+                if (onLoadSlot != null) onLoadSlot.accept(slot);
+            }).setVisible(true);
+        }
+    }
+
+    public String busyMessage() {
+        if (animating) return BusyReason.ANIMATION.message();
+        return busy.message();
+    }
+
+    public boolean isBusy() {
+        return animating || busy.busy();
+    }
+
+    private void setBusy(BusyReason reason) {
+        this.busy = reason == null ? BusyReason.NONE : reason;
+        hud.setInputLocked(isBusy(), busyMessage());
+    }
+
+    private void setAnimating(boolean value) {
+        this.animating = value;
+        hud.setInputLocked(isBusy(), busyMessage());
     }
 
     public void refresh() {

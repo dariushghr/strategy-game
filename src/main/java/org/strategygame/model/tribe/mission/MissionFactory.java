@@ -105,6 +105,8 @@ class HuntMission extends TribeMission {
         this.killsAtStart = killsAtStart;
     }
 
+    int getKillsAtStart() { return killsAtStart; }
+
     @Override public String getTitle() { return "شکار دشمنان" ; }
 
     @Override public String getObjectiveText() {
@@ -165,16 +167,24 @@ public final class MissionFactory {
     private MissionFactory() { }
 
     public static TribeMission create(Tribe tribe) {
-        TribeType type = tribe.getType();
+        return restore(tribe.getType(), tribe.getNearbyEnemyKills());
+    }
+
+    /** بازسازی مأموریت از ذخیره؛ برای شکار باید آستانهٔ کشتار همان لحظهٔ قبول مأموریت باشد. */
+    public static TribeMission restore(TribeType type, int huntKillsAtStart) {
         return switch (type) {
             case FARMER   -> new DeliveryMission("تامین آذوقه",
                     new int[]{0, 20, 10, 0}, 5, new int[]{30, 0, 0, 0}, 15);
             case MOUNTAIN -> new DeliveryMission("تامین ابزار",
                     new int[]{0, 15, 0, 10}, 6, new int[]{0, 0, 20, 0}, 15);
             case MERCHANT -> new RoadMission();
-            case WARRIOR  -> new HuntMission(tribe.getNearbyEnemyKills());
+            case WARRIOR  -> new HuntMission(huntKillsAtStart);
             case COASTAL  -> new DockMission();
         };
+    }
+
+    public static int huntKillsAtStart(TribeMission mission) {
+        return mission instanceof HuntMission hunt ? hunt.getKillsAtStart() : 0;
     }
 
     /** فهرست خلاصه‌ی مأموریت هر نوع قبیله برای نمایش در پنل. */

@@ -12,6 +12,10 @@ public class Wall implements Structure {
     private final int maxHp = GameConfig.WALL_MAX_HP;
     private int hp = GameConfig.WALL_MAX_HP;
 
+    public Wall() { }
+
+    public Wall(int hp) { this.hp = Math.max(0, Math.min(maxHp, hp)); }
+
     @Override public int getHp()      { return hp; }
     @Override public int getMaxHp()   { return maxHp; }
     @Override public int getDefense() { return GameConfig.WALL_DEFENSE_BONUS; }

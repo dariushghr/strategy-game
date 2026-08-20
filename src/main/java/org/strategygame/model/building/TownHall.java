@@ -41,6 +41,18 @@ public class TownHall extends Building {
     }
 
     /** یک سطح ارتقا می‌دهد و سطح جدید را برمی‌گرداند. */
+    /** بازگرداندن سطح ذخیره‌شده بدون اعمال اثر ارتقا. */
+    public void restoreLevel(TownHallLevel saved) {
+        if (saved != null) this.level = saved;
+    }
+
+    public void restoreDefensiveWall(boolean v) {
+        if (!v || defensiveWall) return;
+        defensiveWall = true;
+        setDefense(GameConfig.DEFENSIVE_ARCHITECTURE_DEFENSE);
+        setMaxHp(GameConfig.DEFENSIVE_ARCHITECTURE_MAX_HP);
+    }
+
     public TownHallLevel levelUp() {
         TownHallLevel next = level.next();
         if (next == null) return null;

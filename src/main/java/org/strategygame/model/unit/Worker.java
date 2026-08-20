@@ -20,8 +20,13 @@ public class Worker extends Unit {
         if (stationedAt != null) {
             stationedAt.removeWorker(this);
             stationedAt = null;
-
         }
+    }
+
+    /** اتصال کارگر به سازه بدون مصرف AP؛ فقط از مسیر Load. */
+    public void restoreStation(Building b) {
+        this.stationedAt = b;
+        if (b != null) b.restoreAddWorker(this);
     }
 
     @Override public UnitType getType() { return UnitType.WORKER; }

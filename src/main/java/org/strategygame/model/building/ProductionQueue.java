@@ -10,6 +10,8 @@ public class ProductionQueue {
 
     private TownHallCommand active;
 
+    public void restoreActive(TownHallCommand command) { this.active = command; }
+
     public boolean isEmpty()               { return active == null; }
     public TownHallCommand getActive()     { return active; }
     public int getTurnsLeft()              { return active == null ? 0 : active.getTurnsLeft(); }

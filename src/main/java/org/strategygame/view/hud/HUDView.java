@@ -35,6 +35,7 @@ public class HUDView extends JPanel {
     private final JButton tradeBtn     = toolBtn("تجارت");
     private final JButton logBtn       = toolBtn("رویدادها");
     private final JButton debugBtn     = toolBtn("دیباگ");
+    private final JButton saveBtn      = toolBtn("ذخیره");
 
     private Runnable onEndTurn;
     private BoolCB   onOverlayToggle;
@@ -82,6 +83,7 @@ public class HUDView extends JPanel {
         tools.add(tradeBtn);
         tools.add(logBtn);
         tools.add(debugBtn);
+        tools.add(saveBtn);
 
         overlayBox.setOpaque(false);
         overlayBox.setForeground(new Color(200, 215, 235));
@@ -191,6 +193,14 @@ public class HUDView extends JPanel {
     public void setOnTrade(Runnable r)    { bind(tradeBtn, r); }
     public void setOnLog(Runnable r)      { bind(logBtn, r); }
     public void setOnDebug(Runnable r)    { bind(debugBtn, r); }
+    public void setOnSave(Runnable r)     { bind(saveBtn, r); }
+
+    public void setInputLocked(boolean locked, String reason) {
+        endTurnBtn.setEnabled(!locked);
+        saveBtn.setEnabled(!locked);
+        endTurnBtn.setToolTipText(locked ? reason : "پایان نوبت");
+        saveBtn.setToolTipText(locked && reason != null ? reason : "ذخیره بازی");
+    }
 
     private void bind(JButton button, Runnable action) {
         button.addActionListener(e -> action.run());
