@@ -5,7 +5,12 @@ import org.strategygame.model.building.Building;
 import org.strategygame.model.command.TownHallCommand;
 import org.strategygame.model.disaster.DisasterEvent;
 import org.strategygame.model.disaster.DisasterType;
+import org.strategygame.model.event.DisasterStartedEvent;
+import org.strategygame.model.event.EventBus;
 import org.strategygame.model.event.NotificationKind;
+import org.strategygame.model.event.SaveCompletedEvent;
+import org.strategygame.model.event.TurnEndedEvent;
+import org.strategygame.save.SaveSlot;
 import org.strategygame.model.resource.ResourceStorage;
 import org.strategygame.model.resource.ResourceType;
 import org.strategygame.model.season.Season;
@@ -27,6 +32,8 @@ public class TurnController {
     private final GameState    state;
     private final GameServices services;
     private GameWindow window;
+    private SaveController saveCtrl;
+    private EventBus events;
 
     public TurnController(GameState state, GameServices services) {
         this.state    = state;
@@ -34,6 +41,8 @@ public class TurnController {
     }
 
     public void setWindow(GameWindow window) { this.window = window; }
+    public void setSaveController(SaveController saveCtrl) { this.saveCtrl = saveCtrl; }
+    public void setEventBus(EventBus events) { this.events = events; }
 
     public void execute() {
         // ---------------------------------------------------- پایان نوبت بازیکن
@@ -59,6 +68,9 @@ public class TurnController {
 
         services.tribe().updateDiscovery(state);
         state.getFog().update(state.getUnits(), state.getBuildings());
+
+        if (events != null) events.publish(new TurnEndedEvent(state.getTurn(), state.getSeason()));
+        autosaveQuietly();
 
         if (window != null) window.onTurnAdvanced();
     }
@@ -133,13 +145,15 @@ public class TurnController {
 
     private void rollDisaster() {
         DisasterEvent event = services.disaster().rollForTurn(state);
-        if (event == null || window == null) return;
-        window.onDisaster(event);
+        if (event == null) return;
+        if (events != null) events.publish(new DisasterStartedEvent(event));
+        if (window != null) window.onDisaster(event);
     }
 
     /** برای دیباگ: اجرای دستی یک بلای طبیعی بدون انتظار برای قرعه‌ی ۵٪. */
     public DisasterEvent forceDisaster(DisasterType type) {
         DisasterEvent event = services.disaster().trigger(state, type);
+        if (event != null && events != null) events.publish(new DisasterStartedEvent(event));
         if (event != null && window != null) window.onDisaster(event);
         return event;
     }
@@ -157,5 +171,16 @@ public class TurnController {
             case FLOOD       -> !services.disaster().floodCenters(state).isEmpty();
             case BEAR_ATTACK -> !services.disaster().bearDens(state).isEmpty();
         };
+    }
+
+    private void autosaveQuietly() {
+        if (saveCtrl == null) return;
+        var result = saveCtrl.autosave();
+        if (events != null) {
+            events.publish(new SaveCompletedEvent(SaveSlot.AUTOSAVE, true, result.success(), result.message()));
+        }
+        if (!result.success()) {
+            state.notify(NotificationKind.GENERAL, "ذخیرهٔ خودکار انجام نشد");
+        }
     }
 }
